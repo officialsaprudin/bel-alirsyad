@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bell Enterprise - Sistem Bel Sekolah Otomatis</title>
+  <title>AetherBell Enterprise - Sistem Bel Sekolah Otomatis</title>
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -83,6 +83,12 @@
           <span class="hidden sm:inline">Uji Bel 60 Detik</span>
         </button>
 
+        <!-- Tombol Uji Peringatan Istirahat 5 Menit -->
+        <button onclick="simulateBreakWarning5Min()" class="px-3 py-1.5 rounded-lg border border-amber-500/40 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" title="Uji Peringatan Sisa Waktu Istirahat 5 Menit">
+          <i data-lucide="coffee" class="w-4 h-4 text-amber-300"></i>
+          <span class="hidden sm:inline">Uji Warning 5m Istirahat</span>
+        </button>
+
         <!-- Tombol Manajemen Bank Suara MP3 Lokal -->
         <button onclick="openSoundLibraryModal()" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition" title="Kelola Koleksi File MP3 Bel Sekolah">
           <i data-lucide="music" class="w-4 h-4 text-indigo-400"></i>
@@ -107,6 +113,27 @@
   </header>
 
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Spanduk Peringatan 5 Menit Sisa Istirahat -->
+    <div id="breakWarningBanner" class="hidden items-center justify-between p-4 bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 border-2 border-amber-500/80 rounded-2xl shadow-2xl shadow-amber-950/60 animate-pulse">
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/40">
+          <i data-lucide="coffee" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="text-xs uppercase tracking-widest font-mono font-bold text-amber-400 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+            PERINGATAN WAKTU ISTIRAHAT
+          </div>
+          <div id="breakWarningBannerText" class="text-sm sm:text-base font-extrabold text-white">
+            Waktu istirahat tersisa 5 menit lagi! Harap bersiap masuk kelas.
+          </div>
+        </div>
+      </div>
+      <button onclick="dismissBreakWarningBanner()" class="text-xs px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 rounded-lg transition">
+        Tutup
+      </button>
+    </div>
 
     <!-- Top Live Status Card -->
     <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -362,17 +389,75 @@
 
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Sesi / Jam Ke-</label>
-          <input type="text" id="formTitle" required placeholder="Contoh: Jam Pelajaran Ke-1, Istirahat, dll." class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          <input type="text" id="formTitle" required placeholder="Contoh: Jam Pelajaran Ke-1, Istirahat Pertama, dll." class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Jam Mulai (HH:MM)</label>
-            <input type="time" id="formStartTime" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        <!-- Pengaturan Waktu: Hanya Jam Mulai, Selesai Otomatis Menyesuaikan -->
+        <div class="p-3.5 bg-slate-950/60 rounded-xl border border-slate-800 space-y-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <div>
+              <label class="block text-xs font-semibold text-indigo-300 mb-1 flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5"></i> Jam Mulai (HH:MM) <span class="text-rose-400">*</span>
+              </label>
+              <input type="time" id="formStartTime" required class="w-full bg-slate-800 border border-indigo-500/50 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono font-bold">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1 flex items-center gap-1.5">
+                <i data-lucide="link-2" class="w-3.5 h-3.5"></i> Jam Selesai
+              </label>
+              <div class="text-xs font-mono bg-slate-900 border border-slate-700/80 rounded-lg px-3 py-2.5 text-slate-300 flex items-center justify-between">
+                <span id="formEndTimeDisplay">Otomatis Terhubung</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">Auto-Sync</span>
+              </div>
+            </div>
           </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Jam Selesai (HH:MM)</label>
-            <input type="time" id="formEndTime" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          <p class="text-[11px] text-slate-400 flex items-center gap-1">
+            <i data-lucide="info" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"></i>
+            Waktu selesai otomatis disamakan dengan jam mulai sesi berikutnya. Untuk sesi terakhir, durasi default 45 menit.
+          </p>
+        </div>
+
+        <!-- Opsi Jam Istirahat & Peringatan 5 Menit Selesai -->
+        <div class="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="formIsBreak" onchange="toggleBreakWarningOptions(this.checked)" class="w-4 h-4 rounded text-amber-500 bg-slate-800 border-slate-700 focus:ring-amber-500">
+              <label for="formIsBreak" class="text-xs font-semibold text-slate-200 cursor-pointer flex items-center gap-1.5">
+                <i data-lucide="coffee" class="w-4 h-4 text-amber-400"></i> Tandai sebagai Jam Istirahat
+              </label>
+            </div>
+            <span class="text-[10px] font-mono px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded border border-amber-500/20">Fitur Istirahat</span>
+          </div>
+
+          <!-- Sub-panel Audio Peringatan 5 Menit Sebelum Istirahat Selesai -->
+          <div id="breakWarningConfigSection" class="hidden pt-2 border-t border-slate-800/80 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="block text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i> Audio Peringatan 5 Menit Sebelum Selesai
+              </label>
+              <span class="text-[10px] text-slate-400 font-mono">Diputar saat sisa 5m</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <select id="formBreakWarningTone" class="flex-1 bg-slate-800 border border-amber-500/40 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500">
+                <optgroup label="Audio Bawaan">
+                  <option value="chime_triple">Triad 3-Not (Peringatan Halus Bawaan)</option>
+                  <option value="westminster">Nada Westminster</option>
+                  <option value="two_tone">Ding-Dong 2-Not</option>
+                  <option value="gong">Gong Resonansi</option>
+                </optgroup>
+                <optgroup id="formBreakWarningCustomOptgroup" label="File MP3 Kustom (Lokal)">
+                  <!-- MP3 Kustom diisi otomatis oleh JS -->
+                </optgroup>
+              </select>
+              <button type="button" onclick="previewBreakWarningTone()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-medium flex items-center gap-1 transition" title="Uji Dengar Audio Warning">
+                <i data-lucide="play" class="w-3.5 h-3.5 text-amber-400"></i> Coba
+              </button>
+            </div>
+            <p class="text-[11px] text-amber-400/80 flex items-center gap-1">
+              <i data-lucide="volume-2" class="w-3 h-3 flex-shrink-0"></i>
+              Sistem akan memutar audio ini + narasi suara "Waktu istirahat tersisa 5 menit lagi".
+            </p>
           </div>
         </div>
 
@@ -519,16 +604,16 @@
         activeBtnClass: 'bg-indigo-600 text-white shadow-indigo-600/30 border-indigo-500',
         icon: 'calendar',
         schedules: [
-          { id: 'reg_1', title: 'Literasi & Doa Pagi', startTime: '07:00', endTime: '07:30', toneType: 'chime_triple', isActive: true },
-          { id: 'reg_2', title: 'Jam Pelajaran Ke-1', startTime: '07:30', endTime: '08:15', toneType: 'westminster', isActive: true },
-          { id: 'reg_3', title: 'Jam Pelajaran Ke-2', startTime: '08:15', endTime: '09:00', toneType: 'two_tone', isActive: true },
-          { id: 'reg_4', title: 'Jam Pelajaran Ke-3', startTime: '09:00', endTime: '09:45', toneType: 'two_tone', isActive: true },
-          { id: 'reg_5', title: 'Istirahat Pertama', startTime: '09:45', endTime: '10:15', toneType: 'westminster', isActive: true },
-          { id: 'reg_6', title: 'Jam Pelajaran Ke-4', startTime: '10:15', endTime: '11:00', toneType: 'two_tone', isActive: true },
-          { id: 'reg_7', title: 'Jam Pelajaran Ke-5', startTime: '11:00', endTime: '11:45', toneType: 'two_tone', isActive: true },
-          { id: 'reg_8', title: 'Jam Pelajaran Ke-6 & Sholat', startTime: '11:45', endTime: '12:30', toneType: 'gong', isActive: true },
-          { id: 'reg_9', title: 'Jam Pelajaran Ke-7', startTime: '12:30', endTime: '13:15', toneType: 'two_tone', isActive: true },
-          { id: 'reg_10', title: 'Jam Pelajaran Ke-8 (Bel Pulang)', startTime: '13:15', endTime: '14:00', toneType: 'westminster', isActive: true }
+          { id: 'reg_1', title: 'Literasi & Doa Pagi', startTime: '07:00', endTime: '07:30', toneType: 'chime_triple', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_2', title: 'Jam Pelajaran Ke-1', startTime: '07:30', endTime: '08:15', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_3', title: 'Jam Pelajaran Ke-2', startTime: '08:15', endTime: '09:00', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_4', title: 'Jam Pelajaran Ke-3', startTime: '09:00', endTime: '09:45', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_5', title: 'Istirahat Pertama', startTime: '09:45', endTime: '10:15', toneType: 'westminster', isBreak: true, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_6', title: 'Jam Pelajaran Ke-4', startTime: '10:15', endTime: '11:00', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_7', title: 'Jam Pelajaran Ke-5', startTime: '11:00', endTime: '11:45', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_8', title: 'Jam Pelajaran Ke-6 & Sholat', startTime: '11:45', endTime: '12:30', toneType: 'gong', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_9', title: 'Jam Pelajaran Ke-7', startTime: '12:30', endTime: '13:15', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'reg_10', title: 'Jam Pelajaran Ke-8 (Bel Pulang)', startTime: '13:15', endTime: '14:00', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true }
         ]
       },
       ulangan_2: {
@@ -539,11 +624,11 @@
         activeBtnClass: 'bg-emerald-600 text-white shadow-emerald-600/30 border-emerald-500',
         icon: 'file-text',
         schedules: [
-          { id: 'u2_1', title: 'Masuk & Pengarahan Ujian', startTime: '07:15', endTime: '07:30', toneType: 'chime_triple', isActive: true },
-          { id: 'u2_2', title: 'Ujian Sesi 1 (Mata Pelajaran I)', startTime: '07:30', endTime: '09:30', toneType: 'westminster', isActive: true },
-          { id: 'u2_3', title: 'Istirahat & Belajar Mandiri', startTime: '09:30', endTime: '10:00', toneType: 'two_tone', isActive: true },
-          { id: 'u2_4', title: 'Ujian Sesi 2 (Mata Pelajaran II)', startTime: '10:00', endTime: '12:00', toneType: 'westminster', isActive: true },
-          { id: 'u2_5', title: 'Pengumpulan Lembar & Bel Pulang', startTime: '12:00', endTime: '12:15', toneType: 'gong', isActive: true }
+          { id: 'u2_1', title: 'Masuk & Pengarahan Ujian', startTime: '07:15', endTime: '07:30', toneType: 'chime_triple', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u2_2', title: 'Ujian Sesi 1 (Mata Pelajaran I)', startTime: '07:30', endTime: '09:30', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u2_3', title: 'Istirahat & Belajar Mandiri', startTime: '09:30', endTime: '10:00', toneType: 'two_tone', isBreak: true, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u2_4', title: 'Ujian Sesi 2 (Mata Pelajaran II)', startTime: '10:00', endTime: '12:00', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u2_5', title: 'Pengumpulan Lembar & Bel Pulang', startTime: '12:00', endTime: '12:15', toneType: 'gong', isBreak: false, breakWarningTone: 'chime_triple', isActive: true }
         ]
       },
       ulangan_3: {
@@ -554,13 +639,13 @@
         activeBtnClass: 'bg-cyan-600 text-white shadow-cyan-600/30 border-cyan-500',
         icon: 'files',
         schedules: [
-          { id: 'u3_1', title: 'Doa & Masuk Ruang Ujian', startTime: '07:15', endTime: '07:30', toneType: 'chime_triple', isActive: true },
-          { id: 'u3_2', title: 'Ujian Sesi 1', startTime: '07:30', endTime: '09:00', toneType: 'westminster', isActive: true },
-          { id: 'u3_3', title: 'Istirahat Pertama', startTime: '09:00', endTime: '09:30', toneType: 'two_tone', isActive: true },
-          { id: 'u3_4', title: 'Ujian Sesi 2', startTime: '09:30', endTime: '11:00', toneType: 'westminster', isActive: true },
-          { id: 'u3_5', title: 'Istirahat Kedua & Sholat', startTime: '11:00', endTime: '11:30', toneType: 'two_tone', isActive: true },
-          { id: 'u3_6', title: 'Ujian Sesi 3', startTime: '11:30', endTime: '13:00', toneType: 'westminster', isActive: true },
-          { id: 'u3_7', title: 'Bel Kepulangan Siswa', startTime: '13:00', endTime: '13:15', toneType: 'gong', isActive: true }
+          { id: 'u3_1', title: 'Doa & Masuk Ruang Ujian', startTime: '07:15', endTime: '07:30', toneType: 'chime_triple', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u3_2', title: 'Ujian Sesi 1', startTime: '07:30', endTime: '09:00', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u3_3', title: 'Istirahat Pertama', startTime: '09:00', endTime: '09:30', toneType: 'two_tone', isBreak: true, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u3_4', title: 'Ujian Sesi 2', startTime: '09:30', endTime: '11:00', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u3_5', title: 'Istirahat Kedua & Sholat', startTime: '11:00', endTime: '11:30', toneType: 'two_tone', isBreak: true, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u3_6', title: 'Ujian Sesi 3', startTime: '11:30', endTime: '13:00', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'u3_7', title: 'Bel Kepulangan Siswa', startTime: '13:00', endTime: '13:15', toneType: 'gong', isBreak: false, breakWarningTone: 'chime_triple', isActive: true }
         ]
       },
       darurat_1: {
@@ -571,14 +656,14 @@
         activeBtnClass: 'bg-amber-600 text-white shadow-amber-600/30 border-amber-500',
         icon: 'clock',
         schedules: [
-          { id: 'd1_1', title: 'Doa Pagi Singkat', startTime: '07:30', endTime: '07:45', toneType: 'chime_triple', isActive: true },
-          { id: 'd1_2', title: 'Jam Ke-1 (Versi Ringkas)', startTime: '07:45', endTime: '08:15', toneType: 'westminster', isActive: true },
-          { id: 'd1_3', title: 'Jam Ke-2 (Versi Ringkas)', startTime: '08:15', endTime: '08:45', toneType: 'two_tone', isActive: true },
-          { id: 'd1_4', title: 'Jam Ke-3 (Versi Ringkas)', startTime: '08:45', endTime: '09:15', toneType: 'two_tone', isActive: true },
-          { id: 'd1_5', title: 'Istirahat Ringkas', startTime: '09:15', endTime: '09:35', toneType: 'two_tone', isActive: true },
-          { id: 'd1_6', title: 'Jam Ke-4 (Versi Ringkas)', startTime: '09:35', endTime: '10:05', toneType: 'two_tone', isActive: true },
-          { id: 'd1_7', title: 'Jam Ke-5 (Versi Ringkas)', startTime: '10:05', endTime: '10:35', toneType: 'two_tone', isActive: true },
-          { id: 'd1_8', title: 'Kepulangan Dipercepat', startTime: '10:35', endTime: '11:00', toneType: 'gong', isActive: true }
+          { id: 'd1_1', title: 'Doa Pagi Singkat', startTime: '07:30', endTime: '07:45', toneType: 'chime_triple', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd1_2', title: 'Jam Ke-1 (Versi Ringkas)', startTime: '07:45', endTime: '08:15', toneType: 'westminster', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd1_3', title: 'Jam Ke-2 (Versi Ringkas)', startTime: '08:15', endTime: '08:45', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd1_4', title: 'Jam Ke-3 (Versi Ringkas)', startTime: '08:45', endTime: '09:15', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd1_5', title: 'Istirahat Ringkas', startTime: '09:15', endTime: '09:35', toneType: 'two_tone', isBreak: true, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd1_6', title: 'Jam Ke-4 (Versi Ringkas)', startTime: '09:35', endTime: '10:05', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd1_7', title: 'Jam Ke-5 (Versi Ringkas)', startTime: '10:05', endTime: '10:35', toneType: 'two_tone', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd1_8', title: 'Kepulangan Dipercepat', startTime: '10:35', endTime: '11:00', toneType: 'gong', isBreak: false, breakWarningTone: 'chime_triple', isActive: true }
         ]
       },
       darurat_2: {
@@ -589,9 +674,9 @@
         activeBtnClass: 'bg-rose-600 text-white shadow-rose-600/30 border-rose-500',
         icon: 'alert-triangle',
         schedules: [
-          { id: 'd2_1', title: 'Peringatan Darurat & Kumpul Lapangan', startTime: '08:00', endTime: '08:20', toneType: 'gong', isActive: true },
-          { id: 'd2_2', title: 'Pengarahan Khusus & Koordinasi', startTime: '08:20', endTime: '09:00', toneType: 'chime_triple', isActive: true },
-          { id: 'd2_3', title: 'Pemulangan Darurat Terkoordinasi', startTime: '09:00', endTime: '09:30', toneType: 'gong', isActive: true }
+          { id: 'd2_1', title: 'Peringatan Darurat & Kumpul Lapangan', startTime: '08:00', endTime: '08:20', toneType: 'gong', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd2_2', title: 'Pengarahan Khusus & Koordinasi', startTime: '08:20', endTime: '09:00', toneType: 'chime_triple', isBreak: false, breakWarningTone: 'chime_triple', isActive: true },
+          { id: 'd2_3', title: 'Pemulangan Darurat Terkoordinasi', startTime: '09:00', endTime: '09:30', toneType: 'gong', isBreak: false, breakWarningTone: 'chime_triple', isActive: true }
         ]
       }
     };
@@ -601,6 +686,7 @@
       activePreset: localStorage.getItem(STORAGE_KEY_ACTIVE_PRESET) || 'reguler',
       schedules: [],
       lastTriggeredMinute: '',
+      lastBreakWarningMinute: '',
       isKioskActive: false,
       isTakeoverActive: false,
       takeoverSecondsLeft: 60,
@@ -613,6 +699,31 @@
       if (!timeStr) return 0;
       const [h, m] = timeStr.split(':').map(Number);
       return (h || 0) * 60 + (m || 0);
+    }
+
+    function minutesToTimeString(totalMinutes) {
+      const h = Math.floor(totalMinutes / 60) % 24;
+      const m = totalMinutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function autoSyncAllEndTimes(schedulesList) {
+      if (!schedulesList || schedulesList.length === 0) return [];
+      const sorted = [...schedulesList].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      for (let i = 0; i < sorted.length; i++) {
+        if (i < sorted.length - 1) {
+          // Waktu selesai otomatis diselaraskan dengan jam mulai jadwal berikutnya
+          sorted[i].endTime = sorted[i + 1].startTime;
+        } else {
+          // Sesi paling akhir: jika kosong atau invalid, otomatis berdurasi 45 menit
+          const startM = timeToMinutes(sorted[i].startTime);
+          const endM = timeToMinutes(sorted[i].endTime);
+          if (!sorted[i].endTime || endM <= startM) {
+            sorted[i].endTime = minutesToTimeString(startM + 45);
+          }
+        }
+      }
+      return sorted;
     }
 
     function getTimeInTimezone(tz) {
@@ -760,11 +871,29 @@
       }
 
       // Pemicu Otomatis Bel pada Detik '00'
-      if (timeData.seconds === '00' && state.lastTriggeredMinute !== timeData.shortTime) {
-        const matchedSchedule = state.schedules.find(s => s.isActive && s.startTime === timeData.shortTime);
-        if (matchedSchedule) {
-          state.lastTriggeredMinute = timeData.shortTime;
-          executeScheduledBellEvent(matchedSchedule);
+      if (timeData.seconds === '00') {
+        // 1. Pemicu Bel Masuk Jam Pelajaran
+        if (state.lastTriggeredMinute !== timeData.shortTime) {
+          const matchedSchedule = state.schedules.find(s => s.isActive && s.startTime === timeData.shortTime);
+          if (matchedSchedule) {
+            state.lastTriggeredMinute = timeData.shortTime;
+            executeScheduledBellEvent(matchedSchedule);
+          }
+        }
+
+        // 2. Pemicu Peringatan 5 Menit Sebelum Jam Istirahat Selesai
+        if (state.lastBreakWarningMinute !== timeData.shortTime) {
+          const currentTotalMins = timeToMinutes(timeData.shortTime);
+          const breakItemWarning = state.schedules.find(s => {
+            if (!s.isActive || !s.isBreak) return false;
+            const endMins = timeToMinutes(s.endTime);
+            return (endMins - 5) === currentTotalMins;
+          });
+
+          if (breakItemWarning) {
+            state.lastBreakWarningMinute = timeData.shortTime;
+            executeBreakWarningEvent(breakItemWarning);
+          }
         }
       }
     }
@@ -789,8 +918,11 @@
                 startTime: item.start_time,
                 endTime: item.end_time,
                 toneType: item.tone_type,
+                isBreak: !!item.is_break,
+                breakWarningTone: item.break_warning_tone || 'chime_triple',
                 isActive: item.is_active
               }));
+              state.schedules = autoSyncAllEndTimes(state.schedules);
               persistSchedulesLocal();
               if (statusText) statusText.innerText = "Supabase Terhubung";
             } else {
@@ -841,6 +973,7 @@
         const fallback = PRESET_TEMPLATES[presetKey]?.schedules || PRESET_TEMPLATES.reguler.schedules;
         state.schedules = JSON.parse(JSON.stringify(fallback));
       }
+      state.schedules = autoSyncAllEndTimes(state.schedules);
     }
 
     function persistSchedulesLocal() {
@@ -915,7 +1048,7 @@
         state.schedules.push(scheduleItem);
       }
 
-      state.schedules.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      state.schedules = autoSyncAllEndTimes(state.schedules);
       persistSchedulesLocal();
 
       if (!is_preview && supabaseClient) {
@@ -926,17 +1059,20 @@
           start_time: scheduleItem.startTime,
           end_time: scheduleItem.endTime,
           tone_type: scheduleItem.toneType,
+          is_break: scheduleItem.isBreak,
+          break_warning_tone: scheduleItem.breakWarningTone,
           is_active: scheduleItem.isActive,
           updated_at: new Date().toISOString()
         }).then(() => {});
       }
 
       renderScheduleTable();
-      showToast("Jadwal bel berhasil disimpan!", "success");
+      showToast("Jadwal bel berhasil disimpan & waktu selesai diselaraskan!", "success");
     }
 
     function deleteSchedule(id) {
       state.schedules = state.schedules.filter(s => s.id !== id);
+      state.schedules = autoSyncAllEndTimes(state.schedules);
       persistSchedulesLocal();
 
       if (!is_preview && supabaseClient) {
@@ -1164,6 +1300,61 @@
       }
     }
 
+    function executeBreakWarningEvent(breakItem) {
+      initAudioContext();
+      const warningTone = breakItem.breakWarningTone || 'chime_triple';
+      playAudioToneOrFile(warningTone);
+
+      setTimeout(() => {
+        announceBreakWarningVoice(breakItem.title);
+      }, 1200);
+
+      showBreakWarningBanner(breakItem);
+      showToast(`⚠️ Waktu istirahat tersisa 5 menit lagi (${breakItem.title})!`, "warning");
+    }
+
+    function announceBreakWarningVoice(title = "Istirahat") {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(`Perhatian kepada seluruh siswa dan dewan guru, waktu ${title} tersisa lima menit lagi. Harap segera bersiap kembali ke ruang kelas.`);
+        utterance.lang = 'id-ID';
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("Speech synthesis break warning error:", e);
+      }
+    }
+
+    function showBreakWarningBanner(breakItem) {
+      const banner = document.getElementById('breakWarningBanner');
+      const text = document.getElementById('breakWarningBannerText');
+      if (banner && text) {
+        text.innerText = `Waktu ${breakItem.title} tersisa 5 menit lagi (Selesai pukul ${breakItem.endTime})! Harap seluruh siswa bersiap kembali ke kelas.`;
+        banner.classList.remove('hidden');
+        banner.classList.add('flex');
+      }
+    }
+
+    function dismissBreakWarningBanner() {
+      const banner = document.getElementById('breakWarningBanner');
+      if (banner) {
+        banner.classList.add('hidden');
+        banner.classList.remove('flex');
+      }
+    }
+
+    function simulateBreakWarning5Min() {
+      initAudioContext();
+      const activeBreak = state.schedules.find(s => s.isBreak) || {
+        title: "Istirahat Pertama",
+        endTime: "10:15",
+        breakWarningTone: "chime_triple"
+      };
+      executeBreakWarningEvent(activeBreak);
+    }
+
     function executeScheduledBellEvent(scheduleItem) {
       playAudioToneOrFile(scheduleItem.toneType);
       
@@ -1285,15 +1476,32 @@
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-800/40 transition border-b border-slate-800/40";
         
+        const isLastItem = index === state.schedules.length - 1;
+        const breakBadgeHtml = item.isBreak ? `
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm" title="Jam Istirahat (Peringatan audio aktif saat sisa 5 menit)">
+            <i data-lucide="coffee" class="w-3 h-3 text-amber-400"></i> Istirahat (-5m Alert)
+          </span>
+        ` : '';
+
         tr.innerHTML = `
-          <td class="px-4 py-3.5 font-medium text-slate-100 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center justify-center font-mono border border-slate-700">
-              ${index + 1}
-            </span>
-            <span class="font-semibold">${escapeHtml(item.title)}</span>
+          <td class="px-4 py-3.5 font-medium text-slate-100">
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center justify-center font-mono border border-slate-700 flex-shrink-0">
+                ${index + 1}
+              </span>
+              <div class="truncate">
+                <span class="font-semibold block truncate">${escapeHtml(item.title)}</span>
+                ${breakBadgeHtml}
+              </div>
+            </div>
           </td>
-          <td class="px-4 py-3.5 font-mono text-indigo-300 font-bold">${item.startTime}</td>
-          <td class="px-4 py-3.5 font-mono text-slate-400">${item.endTime}</td>
+          <td class="px-4 py-3.5 font-mono text-indigo-300 font-bold text-sm">${item.startTime}</td>
+          <td class="px-4 py-3.5 font-mono text-slate-300">
+            <span class="font-semibold">${item.endTime}</span>
+            <span class="text-[10px] text-slate-500 font-sans block">
+              ${isLastItem ? 'Batas Akhir Sesi' : 'Auto-link ke Jam Berikutnya'}
+            </span>
+          </td>
           <td class="px-4 py-3.5">
             <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
               ${formatToneName(item.toneType)}
@@ -1358,27 +1566,54 @@
 
     function updateToneSelectOptions(selectedId = null) {
       const optgroup = document.getElementById('formCustomAudioOptgroup');
-      if (!optgroup) return;
-      optgroup.innerHTML = '';
+      const breakWarningOptgroup = document.getElementById('formBreakWarningCustomOptgroup');
+      if (optgroup) optgroup.innerHTML = '';
+      if (breakWarningOptgroup) breakWarningOptgroup.innerHTML = '';
 
       if (customSoundsList.length === 0) {
-        const opt = document.createElement('option');
-        opt.disabled = true;
-        opt.value = "";
-        opt.innerText = "(Belum ada MP3 diunggah)";
-        optgroup.appendChild(opt);
+        if (optgroup) {
+          const opt = document.createElement('option');
+          opt.disabled = true;
+          opt.value = "";
+          opt.innerText = "(Belum ada MP3 diunggah)";
+          optgroup.appendChild(opt);
+        }
       } else {
         customSoundsList.forEach(item => {
-          const opt = document.createElement('option');
-          opt.value = item.id;
-          opt.innerText = `🎵 MP3: ${item.name} (${item.size})`;
-          optgroup.appendChild(opt);
+          if (optgroup) {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.innerText = `🎵 MP3: ${item.name} (${item.size})`;
+            optgroup.appendChild(opt);
+          }
+          if (breakWarningOptgroup) {
+            const opt2 = document.createElement('option');
+            opt2.value = item.id;
+            opt2.innerText = `🎵 MP3: ${item.name}`;
+            breakWarningOptgroup.appendChild(opt2);
+          }
         });
       }
 
       if (selectedId) {
         document.getElementById('formToneType').value = selectedId;
       }
+    }
+
+    function toggleBreakWarningOptions(isBreak) {
+      const section = document.getElementById('breakWarningConfigSection');
+      if (!section) return;
+      if (isBreak) {
+        section.classList.remove('hidden');
+      } else {
+        section.classList.add('hidden');
+      }
+    }
+
+    function previewBreakWarningTone() {
+      const tone = document.getElementById('formBreakWarningTone').value || 'chime_triple';
+      playAudioToneOrFile(tone);
+      showToast(`Pratinjau audio peringatan 5m: ${formatToneName(tone)}`, "info");
     }
 
     function handleToneTypeSelectChange(value) {
@@ -1575,15 +1810,24 @@
         document.getElementById('formScheduleId').value = editData.id;
         document.getElementById('formTitle').value = editData.title;
         document.getElementById('formStartTime').value = editData.startTime;
-        document.getElementById('formEndTime').value = editData.endTime;
         document.getElementById('formToneType').value = editData.toneType;
         document.getElementById('formIsActive').checked = editData.isActive;
+        
+        const isBreak = !!editData.isBreak;
+        document.getElementById('formIsBreak').checked = isBreak;
+        toggleBreakWarningOptions(isBreak);
+        document.getElementById('formBreakWarningTone').value = editData.breakWarningTone || 'chime_triple';
+        document.getElementById('formEndTimeDisplay').innerText = editData.endTime ? `Selesai: ${editData.endTime}` : 'Otomatis Terhubung';
       } else {
         document.getElementById('modalTitle').innerHTML = '<i data-lucide="clock" class="w-5 h-5 text-indigo-400"></i> Tambah Jadwal Baru';
         form.reset();
         document.getElementById('formScheduleId').value = '';
         document.getElementById('formIsActive').checked = true;
+        document.getElementById('formIsBreak').checked = false;
+        toggleBreakWarningOptions(false);
         document.getElementById('formToneType').value = 'westminster';
+        document.getElementById('formBreakWarningTone').value = 'chime_triple';
+        document.getElementById('formEndTimeDisplay').innerText = 'Otomatis Terhubung';
       }
       if (window.lucide) lucide.createIcons();
     }
@@ -1605,16 +1849,28 @@
       const id = document.getElementById('formScheduleId').value || `sch_${Date.now()}`;
       const title = document.getElementById('formTitle').value.trim();
       const startTime = document.getElementById('formStartTime').value;
-      const endTime = document.getElementById('formEndTime').value;
       const toneType = document.getElementById('formToneType').value;
       const isActive = document.getElementById('formIsActive').checked;
+      const isBreak = document.getElementById('formIsBreak').checked;
+      const breakWarningTone = document.getElementById('formBreakWarningTone').value || 'chime_triple';
 
-      if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
-        showToast("Jam mulai harus lebih awal dari jam selesai!", "error");
+      if (!startTime) {
+        showToast("Jam mulai wajib diisi!", "error");
         return;
       }
 
-      const scheduleItem = { id, title, startTime, endTime, toneType, isActive };
+      // Waktu selesai diisi sementara (akan diselaraskan otomatis oleh autoSyncAllEndTimes)
+      const scheduleItem = { 
+        id, 
+        title, 
+        startTime, 
+        endTime: '', 
+        toneType, 
+        isBreak, 
+        breakWarningTone, 
+        isActive 
+      };
+
       saveSchedule(scheduleItem);
       closeScheduleModal();
     }
@@ -1622,6 +1878,7 @@
     function resetToDefaultSchedules() {
       const preset = PRESET_TEMPLATES[state.activePreset] || PRESET_TEMPLATES.reguler;
       state.schedules = JSON.parse(JSON.stringify(preset.schedules));
+      state.schedules = autoSyncAllEndTimes(state.schedules);
       persistSchedulesLocal();
       renderScheduleTable();
       runClockCycle();
