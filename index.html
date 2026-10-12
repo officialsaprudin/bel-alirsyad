@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bell Enterprise - Sistem Bel Sekolah Otomatis</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Supabase JS Client v2 CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.25; transform: scale(1); }
+      50% { opacity: 0.75; transform: scale(1.06); }
+    }
+    .bell-glow {
+      animation: pulseGlow 2.8s infinite ease-in-out;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="p-2 bg-indigo-600/20 border border-indigo-500/40 rounded-xl text-indigo-400">
+          <i data-lucide="bell-ring" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            AetherBell <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-mono font-semibold">PROD v3.0</span>
+          </h1>
+          <p class="text-xs text-slate-400 hidden sm:block">Automated Synchronized School Bell & Kiosk Display</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- Audio Activation Engine Button -->
+        <button id="btnAudioEngine" onclick="toggleAudioEngine()" class="px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20">
+          <i data-lucide="volume-2" class="w-4 h-4"></i>
+          <span id="audioEngineLabel">Audio: Klik Aktifkan</span>
+        </button>
+
+        <!-- Tombol Uji Pemicu Bel 60 Detik -->
+        <button onclick="simulate60sTakeover()" class="px-3 py-1.5 rounded-lg border border-indigo-500/40 bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 text-xs font-semibold flex items-center gap-1.5 transition shadow-sm" title="Simulasikan Tampilan Bel Masuk Selama 60 Detik">
+          <i data-lucide="sparkles" class="w-4 h-4 text-amber-300"></i>
+          <span class="hidden sm:inline">Uji Bel 60 Detik</span>
+        </button>
+
+        <!-- Tombol Manajemen Bank Suara MP3 Lokal -->
+        <button onclick="openSoundLibraryModal()" class="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition" title="Kelola Koleksi File MP3 Bel Sekolah">
+          <i data-lucide="music" class="w-4 h-4 text-indigo-400"></i>
+          <span class="hidden sm:inline">Bank MP3</span>
+        </button>
+
+        <!-- Timezone Selector -->
+        <div class="relative inline-block text-left">
+          <select id="timezoneSelect" onchange="changeTimezone(this.value)" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <option value="Asia/Jakarta">WIB (UTC+7)</option>
+            <option value="Asia/Makassar">WITA (UTC+8)</option>
+            <option value="Asia/Jayapura">WIT (UTC+9)</option>
+          </select>
+        </div>
+
+        <!-- Fullscreen Kiosk Mode Button -->
+        <button onclick="toggleFullscreenKiosk()" class="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition" title="Layar Penuh Monitor TV">
+          <i data-lucide="maximize" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Top Live Status Card -->
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- Primary Live Clock Display -->
+      <div class="lg:col-span-2 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 rounded-2xl border border-slate-800 p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden shadow-2xl">
+        <div class="absolute -right-16 -top-16 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none bell-glow"></div>
+        
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+          <div>
+            <span class="text-xs uppercase tracking-widest font-mono text-slate-400">WAKTU AKTIF WILAYAH</span>
+            <div id="displayDate" class="text-sm font-medium text-slate-300">Sinkronisasi kalender...</div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="activeStatusPill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+              <span id="connectionStatusText">Sistem Sinkron</span>
+            </span>
+            <span id="tzBadge" class="text-xs font-mono bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-indigo-300">WITA</span>
+            <span id="activePresetBadge" class="text-xs font-mono px-2.5 py-1 rounded-lg border flex items-center gap-1.5 bg-indigo-500/10 border-indigo-500/30 text-indigo-300 transition-all">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span id="activePresetBadgeText" class="font-bold">Reguler</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="py-6 sm:py-8 flex flex-col sm:flex-row items-baseline gap-2 sm:gap-4">
+          <div id="liveClock" class="font-mono text-5xl sm:text-7xl font-extrabold tracking-tighter text-white tabular-nums">
+            00:00:00
+          </div>
+          <span id="liveSecondsFraction" class="text-slate-500 font-mono text-lg sm:text-2xl">DETIK</span>
+        </div>
+
+        <!-- Progress to Next Period -->
+        <div class="space-y-2">
+          <div class="flex justify-between text-xs text-slate-400">
+            <span id="progressPeriodLabel">Siklus Jam Pelajaran Berjalan</span>
+            <span id="progressRemainingLabel">00m 00s tersisa</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+            <div id="periodProgressBar" class="bg-gradient-to-r from-indigo-500 to-indigo-400 h-2.5 rounded-full transition-all duration-1000" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between shadow-xl space-y-5">
+        <!-- Current Period Card (Tema Hijau Zamrud / Emerald) -->
+        <div class="bg-gradient-to-br from-emerald-950/60 via-slate-900 to-emerald-950/30 border-2 border-emerald-500/50 rounded-xl p-4 relative overflow-hidden shadow-lg shadow-emerald-950/40">
+          <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+          
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+              <span class="relative flex h-2 w-2">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-80"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <i data-lucide="radio" class="w-3.5 h-3.5 text-emerald-400"></i>
+              JAM AKTIF SAAT INI
+            </span>
+            <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30 uppercase">
+              Sedang Berjalan
+            </span>
+          </div>
+
+          <div id="currentSessionTitle" class="text-xl sm:text-2xl font-black text-emerald-50 tracking-tight truncate drop-shadow-sm">
+            Di Luar Jam Pelajaran
+          </div>
+          <p id="currentSessionTime" class="text-xs font-mono font-bold text-emerald-300/90 mt-1">
+            --:-- s/d --:--
+          </p>
+        </div>
+
+        <!-- Upcoming Period Card (Tema Kuning Emas / Amber) -->
+        <div class="bg-gradient-to-br from-amber-950/50 via-slate-900 to-amber-950/20 border-2 border-amber-500/40 rounded-xl p-4 relative overflow-hidden shadow-lg shadow-amber-950/30">
+          <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none"></div>
+          
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[10px] font-extrabold uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+              <i data-lucide="hourglass" class="w-3.5 h-3.5 text-amber-400 animate-pulse"></i>
+              YANG AKAN DATANG
+            </span>
+            <span class="text-[9px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 uppercase">
+              Berikutnya
+            </span>
+          </div>
+
+          <div id="nextSessionTitle" class="text-lg font-bold text-amber-100 tracking-tight truncate">
+            Tidak ada jadwal berikutnya
+          </div>
+          <p id="nextSessionTime" class="text-xs font-mono font-medium text-amber-300/80 mt-1">
+            Menunggu putaran jadwal esok hari
+          </p>
+        </div>
+
+        <!-- Manual Bell Trigger & Controls -->
+        <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-2">
+          <button onclick="triggerManualChime('custom')" class="flex-1 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="bell" class="w-4 h-4"></i> Bunyikan Bel Manual
+          </button>
+          <button onclick="openScheduleModal()" class="py-2 px-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="plus" class="w-4 h-4"></i> Tambah
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+      <div class="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="calendar-clock" class="w-5 h-5 text-indigo-400"></i> Konfigurasi Master Jadwal Bel
+          </h2>
+          <p class="text-xs text-slate-400">Atur jam masuk, perpindahan sesi pelajaran, waktu istirahat, dan kepulangan.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="resetToDefaultSchedules()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 flex items-center gap-1 transition">
+            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reset Standar
+          </button>
+          <button onclick="openScheduleModal()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg flex items-center gap-1 transition">
+            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> Buat Jadwal Baru
+          </button>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-slate-950/70 border-b border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <div class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <span>Mode Jadwal:</span>
+              <span id="presetCurrentTitle" class="text-indigo-300 font-mono">Reguler</span>
+            </div>
+            <div id="currentPresetDesc" class="text-[11px] text-slate-400">Jadwal standar pembelajaran harian</div>
+          </div>
+        </div>
+        <div id="presetTabsContainer" class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <!-- Tombol Template Diisi Otomatis oleh JavaScript -->
+        </div>
+      </div>
+
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left text-xs sm:text-sm">
+          <thead class="bg-slate-950/60 text-slate-400 uppercase font-mono text-[11px] border-b border-slate-800">
+            <tr>
+              <th class="px-4 py-3">Sesi / Jam Ke-</th>
+              <th class="px-4 py-3">Waktu Mulai</th>
+              <th class="px-4 py-3">Waktu Selesai</th>
+              <th class="px-4 py-3">Tipe Bel</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleTableBody" class="divide-y divide-slate-800/60 font-sans">
+            <!-- Dynamic Schedule Rows Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State Container -->
+      <div id="emptyScheduleState" class="hidden p-12 text-center">
+        <i data-lucide="inbox" class="w-10 h-10 text-slate-600 mx-auto mb-2"></i>
+        <h3 class="text-sm font-semibold text-slate-300">Belum ada jadwal tersimpan</h3>
+        <p class="text-xs text-slate-500 mt-1">Tambahkan jadwal baru atau klik "Reset Standar" untuk memuat jadwal umum.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="fullscreenKioskOverlay" class="fixed inset-0 bg-slate-950 z-50 hidden flex-col justify-between p-8 sm:p-14 select-none">
+    
+    <!-- Top Bar inside Fullscreen -->
+    <div class="flex items-center justify-between border-b border-slate-800 pb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-4 h-4 rounded-full bg-emerald-500 animate-ping"></div>
+        <span class="text-sm font-mono tracking-widest uppercase text-slate-400">DISPLAY MONITOR KELAS & SEKOLAH</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <!-- Badge Hitung Mundur 60 Detik Auto-Close -->
+        <div id="takeoverCountdownBadge" class="hidden items-center gap-2 px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 rounded-xl text-amber-300 font-mono text-xs sm:text-sm font-semibold animate-pulse">
+          <i data-lucide="timer" class="w-4 h-4"></i>
+          <span>Kembali ke Dasbor dalam: <strong id="takeoverSecondsText" class="text-white font-bold">60s</strong></span>
+        </div>
+        <span id="kioskPresetBadge" class="px-3 py-1 bg-indigo-950 text-indigo-300 border border-indigo-700/60 rounded-lg font-mono text-xs sm:text-sm font-semibold flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+          <span id="kioskPresetText">Reguler</span>
+        </span>
+        <span id="kioskTimezoneBadge" class="px-3 py-1 bg-slate-800 text-indigo-400 border border-slate-700 rounded-lg font-mono text-sm">WITA</span>
+        <button onclick="dismissFullscreenTakeoverNow()" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Tutup Layar Penuh">
+          <i data-lucide="minimize" class="w-6 h-6"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Center Content: Giant Active Period Announcement -->
+    <div class="text-center py-6 sm:py-12 space-y-4 my-auto">
+      <div id="kioskPulseNotice" class="hidden inline-flex items-center gap-2 px-6 py-2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-sm font-bold tracking-wide animate-bounce">
+        <i data-lucide="bell" class="w-5 h-5"></i> WAKTU PERGANTIAN JAM BERBUNYI
+      </div>
+      
+      <p class="text-slate-400 uppercase tracking-widest text-sm sm:text-base font-semibold">STATUS SAAT INI</p>
+      <h1 id="kioskCurrentPeriodTitle" class="text-4xl sm:text-7xl lg:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-200 to-indigo-400 tracking-tight">
+        JAM PELAJARAN KE-1
+      </h1>
+      
+      <div class="text-2xl sm:text-4xl font-mono text-indigo-300 font-bold" id="kioskCurrentPeriodTime">
+        07:30 - 08:15
+      </div>
+
+      <!-- Giant Digital Clock -->
+      <div class="pt-8">
+        <div id="kioskLiveClock" class="font-mono text-6xl sm:text-9xl font-extrabold text-white tracking-tighter tabular-nums drop-shadow-2xl">
+          07:45:00
+        </div>
+      </div>
+
+      <!-- Visual Bar Auto-Dismiss 60 Detik -->
+      <div id="takeoverBarContainer" class="hidden max-w-xl mx-auto w-full pt-4">
+        <div class="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden border border-slate-700">
+          <div id="takeoverProgressBar" class="bg-gradient-to-r from-amber-400 to-indigo-500 h-2 rounded-full transition-all duration-1000 ease-linear" style="width: 100%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Bar inside Fullscreen: Next Period & Progress -->
+    <div class="border-t border-slate-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="text-left w-full sm:w-auto">
+        <span class="text-xs uppercase text-slate-400 font-mono tracking-wider">SELANJUTNYA</span>
+        <p id="kioskNextPeriodTitle" class="text-base sm:text-xl font-bold text-slate-200">Jam Pelajaran Ke-2 (08:15)</p>
+      </div>
+      <div class="text-right w-full sm:w-auto">
+        <span class="text-xs uppercase text-slate-400 font-mono tracking-wider">SISA WAKTU JAM INI</span>
+        <p id="kioskRemainingCountdown" class="text-base sm:text-xl font-mono font-bold text-emerald-400">29 Menit 12 Detik</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="scheduleModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <h3 id="modalTitle" class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="clock" class="w-5 h-5 text-indigo-400"></i> Tambah Jadwal Baru
+        </h3>
+        <button onclick="closeScheduleModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="scheduleForm" onsubmit="handleSaveSchedule(event)" class="mt-4 space-y-4">
+        <input type="hidden" id="formScheduleId">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Nama Sesi / Jam Ke-</label>
+          <input type="text" id="formTitle" required placeholder="Contoh: Jam Pelajaran Ke-1, Istirahat, dll." class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Jam Mulai (HH:MM)</label>
+            <input type="time" id="formStartTime" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Jam Selesai (HH:MM)</label>
+            <input type="time" id="formEndTime" required class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-300">Tipe Melodi Nada Bel</label>
+            <span class="text-[11px] text-indigo-400 cursor-pointer hover:underline flex items-center gap-1" onclick="openSoundLibraryModal()">
+              <i data-lucide="folder-audio" class="w-3.5 h-3.5"></i> Buka Bank MP3
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select id="formToneType" onchange="handleToneTypeSelectChange(this.value)" class="flex-1 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <optgroup label="Melodi Bel Sintetis (Bawaan)">
+                <option value="westminster">Nada Westminster (Melodi 4-Nada Sekolah)</option>
+                <option value="two_tone">Nada Dua Ketukan (Ding-Dong Klasik)</option>
+                <option value="chime_triple">Nada Tiga Not Triad (Peringatan Halus)</option>
+                <option value="gong">Gong Upacara / Apel</option>
+              </optgroup>
+              <optgroup id="formCustomAudioOptgroup" label="File MP3 Kustom (Lokal)">
+                <!-- Opsi file MP3 kustom diisi otomatis oleh JS -->
+              </optgroup>
+              <optgroup label="Tindakan">
+                <option value="__upload_new__">+ Unggah File MP3 Baru dari Perangkat...</option>
+              </optgroup>
+            </select>
+            <button type="button" onclick="previewCurrentFormTone()" id="btnPreviewTone" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-medium flex items-center gap-1.5 transition" title="Dengarkan pratinjau nada bel ini">
+              <i data-lucide="play" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Coba</span>
+            </button>
+          </div>
+
+          <!-- Panel Pengunggahan Cepat MP3 -->
+          <div id="quickUploadSection" class="hidden mt-2.5 p-3 rounded-xl bg-slate-950/70 border border-indigo-500/40 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-indigo-300 font-semibold flex items-center gap-1.5">
+                <i data-lucide="upload-cloud" class="w-4 h-4 text-indigo-400"></i> Unggah File Audio MP3
+              </span>
+              <button type="button" onclick="hideQuickUploadSection()" class="text-slate-400 hover:text-white text-xs">Batal</button>
+            </div>
+            <div class="flex items-center gap-2">
+              <input type="file" id="mp3QuickFileInput" accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/*" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer">
+              <button type="button" onclick="handleQuickUploadMp3()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Simpan
+              </button>
+            </div>
+            <p class="text-[10px] text-slate-400">Audio disimpan secara lokal di browser via IndexedDB dan beroperasi 100% offline.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <input type="checkbox" id="formIsActive" checked class="w-4 h-4 rounded text-indigo-600 bg-slate-800 border-slate-700 focus:ring-indigo-500">
+          <label for="formIsActive" class="text-xs text-slate-300">Aktifkan alarm bel otomatis untuk jadwal ini</label>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+          <button type="button" onclick="closeScheduleModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-medium transition">
+            Batal
+          </button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold transition">
+            Simpan Jadwal
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="soundLibraryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative space-y-4">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="music" class="w-5 h-5 text-indigo-400"></i> Bank Suara MP3 Sekolah
+        </h3>
+        <button onclick="closeSoundLibraryModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Area Upload Drag-and-Drop / Button -->
+      <div class="p-4 bg-slate-950/70 border border-dashed border-indigo-500/40 rounded-xl text-center space-y-2">
+        <i data-lucide="folder-audio" class="w-8 h-8 text-indigo-400 mx-auto"></i>
+        <div class="text-xs text-slate-200 font-medium">Unggah File Audio Bel Bebas (MP3, WAV, OGG)</div>
+        <p class="text-[11px] text-slate-400">Dapat berupa lagu Mars sekolah, rekaman suara pengumuman, atau nada lonceng khas.</p>
+        <input type="file" id="libraryFileInput" accept="audio/mp3,audio/wav,audio/ogg,audio/mpeg,audio/*" onchange="handleLibraryFileUpload(event)" class="hidden">
+        <button type="button" onclick="document.getElementById('libraryFileInput').click()" class="mt-1 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition">
+          <i data-lucide="upload" class="w-3.5 h-3.5"></i> Pilih File MP3 dari Komputer
+        </button>
+      </div>
+
+      <!-- Daftar File MP3 Tersimpan -->
+      <div>
+        <div class="text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
+          <span>Koleksi MP3 Tersimpan</span>
+          <span id="customSoundCount" class="text-[11px] text-indigo-400 font-mono">0 File</span>
+        </div>
+        <div id="soundLibraryList" class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+          <!-- Item diisi oleh JS -->
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-3 border-t border-slate-800">
+        <button type="button" onclick="closeSoundLibraryModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-medium transition">
+          Selesai
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <script>
+    /* ==========================================================================
+       0. PRODUCTION CONFIGURATION & SUPABASE SETUP
+       ========================================================================== */
+    // STATUS PRODUKSI: Atur false untuk menghubungkan live database Supabase
+    const is_preview = false; 
+
+    // Ganti nilai berikut dengan kredensial project Supabase Anda:
+    const SUPABASE_URL = "https://nfplrikrrkjxgdqbxhql.supabase.co"; 
+    const SUPABASE_ANON_KEY = "sb_publishable_HZ9WpijPp2hxFsXhchc00A_YRdcQwU_";
+    
+    let supabaseClient = null;
+    if (!is_preview && window.supabase && !SUPABASE_URL.includes("your-project-id")) {
+      try {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      } catch (err) {
+        console.warn("Inisialisasi Supabase gagal, beralih ke penyimpanan lokal fail-safe:", err);
+      }
+    }
+
+    /* ==========================================================================
+       0.1 STATE MANAGEMENT & MASTER TEMPLATES
+       ========================================================================== */
+    const STORAGE_KEY_TZ = 'aetherbell_timezone';
+    const STORAGE_KEY_ACTIVE_PRESET = 'aetherbell_active_preset';
+
+    const PRESET_TEMPLATES = {
+      reguler: {
+        id: 'reguler',
+        name: 'Reguler',
+        desc: 'Jadwal pembelajaran harian sekolah normal (8 jam pelajaran)',
+        badgeClass: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
+        activeBtnClass: 'bg-indigo-600 text-white shadow-indigo-600/30 border-indigo-500',
+        icon: 'calendar',
+        schedules: [
+          { id: 'reg_1', title: 'Literasi & Doa Pagi', startTime: '07:00', endTime: '07:30', toneType: 'chime_triple', isActive: true },
+          { id: 'reg_2', title: 'Jam Pelajaran Ke-1', startTime: '07:30', endTime: '08:15', toneType: 'westminster', isActive: true },
+          { id: 'reg_3', title: 'Jam Pelajaran Ke-2', startTime: '08:15', endTime: '09:00', toneType: 'two_tone', isActive: true },
+          { id: 'reg_4', title: 'Jam Pelajaran Ke-3', startTime: '09:00', endTime: '09:45', toneType: 'two_tone', isActive: true },
+          { id: 'reg_5', title: 'Istirahat Pertama', startTime: '09:45', endTime: '10:15', toneType: 'westminster', isActive: true },
+          { id: 'reg_6', title: 'Jam Pelajaran Ke-4', startTime: '10:15', endTime: '11:00', toneType: 'two_tone', isActive: true },
+          { id: 'reg_7', title: 'Jam Pelajaran Ke-5', startTime: '11:00', endTime: '11:45', toneType: 'two_tone', isActive: true },
+          { id: 'reg_8', title: 'Jam Pelajaran Ke-6 & Sholat', startTime: '11:45', endTime: '12:30', toneType: 'gong', isActive: true },
+          { id: 'reg_9', title: 'Jam Pelajaran Ke-7', startTime: '12:30', endTime: '13:15', toneType: 'two_tone', isActive: true },
+          { id: 'reg_10', title: 'Jam Pelajaran Ke-8 (Bel Pulang)', startTime: '13:15', endTime: '14:00', toneType: 'westminster', isActive: true }
+        ]
+      },
+      ulangan_2: {
+        id: 'ulangan_2',
+        name: 'Ulangan 2',
+        desc: 'Penilaian Sumatif / Ujian 2 Mata Pelajaran per hari',
+        badgeClass: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+        activeBtnClass: 'bg-emerald-600 text-white shadow-emerald-600/30 border-emerald-500',
+        icon: 'file-text',
+        schedules: [
+          { id: 'u2_1', title: 'Masuk & Pengarahan Ujian', startTime: '07:15', endTime: '07:30', toneType: 'chime_triple', isActive: true },
+          { id: 'u2_2', title: 'Ujian Sesi 1 (Mata Pelajaran I)', startTime: '07:30', endTime: '09:30', toneType: 'westminster', isActive: true },
+          { id: 'u2_3', title: 'Istirahat & Belajar Mandiri', startTime: '09:30', endTime: '10:00', toneType: 'two_tone', isActive: true },
+          { id: 'u2_4', title: 'Ujian Sesi 2 (Mata Pelajaran II)', startTime: '10:00', endTime: '12:00', toneType: 'westminster', isActive: true },
+          { id: 'u2_5', title: 'Pengumpulan Lembar & Bel Pulang', startTime: '12:00', endTime: '12:15', toneType: 'gong', isActive: true }
+        ]
+      },
+      ulangan_3: {
+        id: 'ulangan_3',
+        name: 'Ulangan 3',
+        desc: 'Penilaian Sumatif / Ujian 3 Mata Pelajaran per hari',
+        badgeClass: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300',
+        activeBtnClass: 'bg-cyan-600 text-white shadow-cyan-600/30 border-cyan-500',
+        icon: 'files',
+        schedules: [
+          { id: 'u3_1', title: 'Doa & Masuk Ruang Ujian', startTime: '07:15', endTime: '07:30', toneType: 'chime_triple', isActive: true },
+          { id: 'u3_2', title: 'Ujian Sesi 1', startTime: '07:30', endTime: '09:00', toneType: 'westminster', isActive: true },
+          { id: 'u3_3', title: 'Istirahat Pertama', startTime: '09:00', endTime: '09:30', toneType: 'two_tone', isActive: true },
+          { id: 'u3_4', title: 'Ujian Sesi 2', startTime: '09:30', endTime: '11:00', toneType: 'westminster', isActive: true },
+          { id: 'u3_5', title: 'Istirahat Kedua & Sholat', startTime: '11:00', endTime: '11:30', toneType: 'two_tone', isActive: true },
+          { id: 'u3_6', title: 'Ujian Sesi 3', startTime: '11:30', endTime: '13:00', toneType: 'westminster', isActive: true },
+          { id: 'u3_7', title: 'Bel Kepulangan Siswa', startTime: '13:00', endTime: '13:15', toneType: 'gong', isActive: true }
+        ]
+      },
+      darurat_1: {
+        id: 'darurat_1',
+        name: 'Darurat 1',
+        desc: 'Jadwal jam dipadatkan (Bulan Ramadhan / Cuaca Ekstrem / Rapat Guru)',
+        badgeClass: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+        activeBtnClass: 'bg-amber-600 text-white shadow-amber-600/30 border-amber-500',
+        icon: 'clock',
+        schedules: [
+          { id: 'd1_1', title: 'Doa Pagi Singkat', startTime: '07:30', endTime: '07:45', toneType: 'chime_triple', isActive: true },
+          { id: 'd1_2', title: 'Jam Ke-1 (Versi Ringkas)', startTime: '07:45', endTime: '08:15', toneType: 'westminster', isActive: true },
+          { id: 'd1_3', title: 'Jam Ke-2 (Versi Ringkas)', startTime: '08:15', endTime: '08:45', toneType: 'two_tone', isActive: true },
+          { id: 'd1_4', title: 'Jam Ke-3 (Versi Ringkas)', startTime: '08:45', endTime: '09:15', toneType: 'two_tone', isActive: true },
+          { id: 'd1_5', title: 'Istirahat Ringkas', startTime: '09:15', endTime: '09:35', toneType: 'two_tone', isActive: true },
+          { id: 'd1_6', title: 'Jam Ke-4 (Versi Ringkas)', startTime: '09:35', endTime: '10:05', toneType: 'two_tone', isActive: true },
+          { id: 'd1_7', title: 'Jam Ke-5 (Versi Ringkas)', startTime: '10:05', endTime: '10:35', toneType: 'two_tone', isActive: true },
+          { id: 'd1_8', title: 'Kepulangan Dipercepat', startTime: '10:35', endTime: '11:00', toneType: 'gong', isActive: true }
+        ]
+      },
+      darurat_2: {
+        id: 'darurat_2',
+        name: 'Darurat 2',
+        desc: 'Protokol Khusus / Apel Darurat / Evakuasi Lapangan',
+        badgeClass: 'bg-rose-500/10 border-rose-500/30 text-rose-300',
+        activeBtnClass: 'bg-rose-600 text-white shadow-rose-600/30 border-rose-500',
+        icon: 'alert-triangle',
+        schedules: [
+          { id: 'd2_1', title: 'Peringatan Darurat & Kumpul Lapangan', startTime: '08:00', endTime: '08:20', toneType: 'gong', isActive: true },
+          { id: 'd2_2', title: 'Pengarahan Khusus & Koordinasi', startTime: '08:20', endTime: '09:00', toneType: 'chime_triple', isActive: true },
+          { id: 'd2_3', title: 'Pemulangan Darurat Terkoordinasi', startTime: '09:00', endTime: '09:30', toneType: 'gong', isActive: true }
+        ]
+      }
+    };
+
+    const state = {
+      timezone: localStorage.getItem(STORAGE_KEY_TZ) || 'Asia/Makassar',
+      activePreset: localStorage.getItem(STORAGE_KEY_ACTIVE_PRESET) || 'reguler',
+      schedules: [],
+      lastTriggeredMinute: '',
+      isKioskActive: false,
+      isTakeoverActive: false,
+      takeoverSecondsLeft: 60,
+      takeoverTimeoutId: null,
+      takeoverIntervalId: null,
+      autoFullscreenOnBell: true
+    };
+
+    function timeToMinutes(timeStr) {
+      if (!timeStr) return 0;
+      const [h, m] = timeStr.split(':').map(Number);
+      return (h || 0) * 60 + (m || 0);
+    }
+
+    function getTimeInTimezone(tz) {
+      const now = new Date();
+      const options = {
+        timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+      };
+      const dateOptions = {
+        timeZone: tz,
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+
+      const formatter = new Intl.DateTimeFormat('id-ID', options);
+      const parts = formatter.formatToParts(now);
+      let hours = '00', minutes = '00', seconds = '00';
+      parts.forEach(p => {
+        if (p.type === 'hour') hours = p.value;
+        if (p.type === 'minute') minutes = p.value;
+        if (p.type === 'second') seconds = p.value;
+      });
+
+      const formattedDate = new Intl.DateTimeFormat('id-ID', dateOptions).format(now);
+      const shortTime = `${hours}:${minutes}`;
+
+      return { hours, minutes, seconds, shortTime, formattedDate };
+    }
+
+    function evaluateScheduleState(currentShortTime, currentSeconds = 0) {
+      const currentTotalMins = timeToMinutes(currentShortTime);
+      const currentTotalSecs = currentTotalMins * 60 + currentSeconds;
+
+      const sorted = [...state.schedules].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      
+      let currentPeriod = null;
+      let nextPeriod = null;
+      let progressPercent = 0;
+      let remainingSeconds = 0;
+
+      for (const item of sorted) {
+        if (!item.isActive) continue;
+        const startMins = timeToMinutes(item.startTime);
+        const endMins = timeToMinutes(item.endTime);
+
+        if (currentTotalMins >= startMins && currentTotalMins < endMins) {
+          currentPeriod = item;
+          const startSecs = startMins * 60;
+          const endSecs = endMins * 60;
+          const totalSecs = endSecs - startSecs;
+          const elapsedSecs = currentTotalSecs - startSecs;
+
+          remainingSeconds = Math.max(0, endSecs - currentTotalSecs);
+          progressPercent = totalSecs > 0 ? Math.min(100, Math.max(0, (elapsedSecs / totalSecs) * 100)) : 0;
+          break;
+        }
+      }
+
+      for (const item of sorted) {
+        if (!item.isActive) continue;
+        const startMins = timeToMinutes(item.startTime);
+        if (startMins > currentTotalMins) {
+          nextPeriod = item;
+          break;
+        }
+      }
+
+      return { currentPeriod, nextPeriod, progressPercent, remainingSeconds };
+    }
+
+    function runClockCycle() {
+      const timeData = getTimeInTimezone(state.timezone);
+
+      // Pembaruan Jam Utama Dasbor
+      const liveClockEl = document.getElementById('liveClock');
+      if (liveClockEl) {
+        liveClockEl.innerText = `${timeData.hours}:${timeData.minutes}:${timeData.seconds}`;
+      }
+      const dateEl = document.getElementById('displayDate');
+      if (dateEl) dateEl.innerText = timeData.formattedDate;
+
+      // Pembaruan Jam Layar Penuh Kiosk
+      const kioskClockEl = document.getElementById('kioskLiveClock');
+      if (kioskClockEl) {
+        kioskClockEl.innerText = `${timeData.hours}:${timeData.minutes}:${timeData.seconds}`;
+      }
+
+      const { currentPeriod, nextPeriod, progressPercent, remainingSeconds } = evaluateScheduleState(timeData.shortTime, parseInt(timeData.seconds));
+
+      // Panel Jam Aktif Saat Ini (Emerald)
+      const curTitleEl = document.getElementById('currentSessionTitle');
+      const curTimeEl = document.getElementById('currentSessionTime');
+      const kioskCurTitle = document.getElementById('kioskCurrentPeriodTitle');
+      const kioskCurTime = document.getElementById('kioskCurrentPeriodTime');
+
+      if (currentPeriod) {
+        if (curTitleEl) curTitleEl.innerText = currentPeriod.title;
+        if (curTimeEl) curTimeEl.innerText = `${currentPeriod.startTime} s/d ${currentPeriod.endTime}`;
+        if (kioskCurTitle && !state.isTakeoverActive) kioskCurTitle.innerText = currentPeriod.title;
+        if (kioskCurTime && !state.isTakeoverActive) kioskCurTime.innerText = `${currentPeriod.startTime} - ${currentPeriod.endTime}`;
+      } else {
+        if (curTitleEl) curTitleEl.innerText = 'Di Luar Jam Pelajaran';
+        if (curTimeEl) curTimeEl.innerText = '--:-- s/d --:--';
+        if (kioskCurTitle && !state.isTakeoverActive) kioskCurTitle.innerText = 'DI LUAR JAM PELAJARAN';
+        if (kioskCurTime && !state.isTakeoverActive) kioskCurTime.innerText = '--:-- - --:--';
+      }
+
+      // Panel Jam Yang Akan Datang (Amber)
+      const nextTitleEl = document.getElementById('nextSessionTitle');
+      const nextTimeEl = document.getElementById('nextSessionTime');
+      const kioskNextTitle = document.getElementById('kioskNextPeriodTitle');
+
+      if (nextPeriod) {
+        if (nextTitleEl) nextTitleEl.innerText = nextPeriod.title;
+        if (nextTimeEl) nextTimeEl.innerText = `Dimulai pukul ${nextPeriod.startTime}`;
+        if (kioskNextTitle) kioskNextTitle.innerText = `${nextPeriod.title} (${nextPeriod.startTime})`;
+      } else {
+        if (nextTitleEl) nextTitleEl.innerText = 'Tidak ada jadwal berikutnya';
+        if (nextTimeEl) nextTimeEl.innerText = 'Menunggu putaran jadwal esok hari';
+        if (kioskNextTitle) kioskNextTitle.innerText = 'Selesai untuk hari ini';
+      }
+
+      // Bilah Progres Durasi Jam
+      const progBar = document.getElementById('periodProgressBar');
+      const progRemaining = document.getElementById('progressRemainingLabel');
+      const kioskCountdown = document.getElementById('kioskRemainingCountdown');
+
+      if (currentPeriod) {
+        const minsLeft = Math.floor(remainingSeconds / 60);
+        const secsLeft = remainingSeconds % 60;
+        const remText = `${minsLeft}m ${secsLeft < 10 ? '0' : ''}${secsLeft}s tersisa`;
+
+        if (progBar) progBar.style.width = `${progressPercent}%`;
+        if (progRemaining) progRemaining.innerText = remText;
+        if (kioskCountdown) kioskCountdown.innerText = `${minsLeft} Menit ${secsLeft} Detik`;
+      } else {
+        if (progBar) progBar.style.width = '0%';
+        if (progRemaining) progRemaining.innerText = 'Standby';
+        if (kioskCountdown) kioskCountdown.innerText = '-- Menit -- Detik';
+      }
+
+      // Pemicu Otomatis Bel pada Detik '00'
+      if (timeData.seconds === '00' && state.lastTriggeredMinute !== timeData.shortTime) {
+        const matchedSchedule = state.schedules.find(s => s.isActive && s.startTime === timeData.shortTime);
+        if (matchedSchedule) {
+          state.lastTriggeredMinute = timeData.shortTime;
+          executeScheduledBellEvent(matchedSchedule);
+        }
+      }
+    }
+
+    function loadSchedules() {
+      const presetKey = state.activePreset || 'reguler';
+      const storageKey = `aetherbell_schedules_${presetKey}`;
+
+      if (!is_preview && supabaseClient) {
+        const statusText = document.getElementById('connectionStatusText');
+        if (statusText) statusText.innerText = "Syncing Cloud...";
+
+        supabaseClient.from('school_schedules')
+          .select('*')
+          .eq('preset_type', presetKey)
+          .order('start_time')
+          .then(({ data, error }) => {
+            if (!error && data && data.length > 0) {
+              state.schedules = data.map(item => ({
+                id: item.id,
+                title: item.title,
+                startTime: item.start_time,
+                endTime: item.end_time,
+                toneType: item.tone_type,
+                isActive: item.is_active
+              }));
+              persistSchedulesLocal();
+              if (statusText) statusText.innerText = "Supabase Terhubung";
+            } else {
+              loadLocalSchedules(presetKey, storageKey);
+              if (statusText) statusText.innerText = "Penyimpanan Lokal";
+            }
+            renderScheduleTable();
+            updatePresetUIIndicators();
+          })
+          .catch(() => {
+            loadLocalSchedules(presetKey, storageKey);
+            renderScheduleTable();
+            updatePresetUIIndicators();
+          });
+      } else {
+        loadLocalSchedules(presetKey, storageKey);
+        renderScheduleTable();
+        updatePresetUIIndicators();
+      }
+    }
+
+    function initSupabaseRealtime() {
+      if (is_preview || !supabaseClient) return;
+
+      try {
+        supabaseClient.channel('public:school_schedules')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'school_schedules' }, (payload) => {
+            if (payload.new && payload.new.preset_type === state.activePreset) {
+              loadSchedules();
+            }
+          })
+          .subscribe();
+      } catch (e) {
+        console.warn("Realtime subscription failed:", e);
+      }
+    }
+
+    function loadLocalSchedules(presetKey, storageKey) {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          state.schedules = JSON.parse(saved);
+        } catch (e) {
+          const fallback = PRESET_TEMPLATES[presetKey]?.schedules || PRESET_TEMPLATES.reguler.schedules;
+          state.schedules = JSON.parse(JSON.stringify(fallback));
+        }
+      } else {
+        const fallback = PRESET_TEMPLATES[presetKey]?.schedules || PRESET_TEMPLATES.reguler.schedules;
+        state.schedules = JSON.parse(JSON.stringify(fallback));
+      }
+    }
+
+    function persistSchedulesLocal() {
+      const storageKey = `aetherbell_schedules_${state.activePreset}`;
+      localStorage.setItem(storageKey, JSON.stringify(state.schedules));
+    }
+
+    function switchPreset(presetKey) {
+      if (!PRESET_TEMPLATES[presetKey]) return;
+      
+      state.activePreset = presetKey;
+      localStorage.setItem(STORAGE_KEY_ACTIVE_PRESET, presetKey);
+
+      loadSchedules();
+      runClockCycle();
+      renderPresetTabs();
+
+      const preset = PRESET_TEMPLATES[presetKey];
+      showToast(`Beralih ke template: ${preset.name}`, "success");
+    }
+
+    function renderPresetTabs() {
+      const container = document.getElementById('presetTabsContainer');
+      if (!container) return;
+
+      container.innerHTML = '';
+
+      Object.values(PRESET_TEMPLATES).forEach(preset => {
+        const isActive = state.activePreset === preset.id;
+        const btn = document.createElement('button');
+        
+        btn.type = 'button';
+        btn.onclick = () => switchPreset(preset.id);
+
+        if (isActive) {
+          btn.className = `px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md border ${preset.activeBtnClass}`;
+        } else {
+          btn.className = "px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700/80 hover:text-white";
+        }
+
+        btn.innerHTML = `
+          <i data-lucide="${preset.icon}" class="w-3.5 h-3.5"></i>
+          <span>${preset.name}</span>
+        `;
+
+        container.appendChild(btn);
+      });
+
+      updatePresetUIIndicators();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function updatePresetUIIndicators() {
+      const preset = PRESET_TEMPLATES[state.activePreset] || PRESET_TEMPLATES.reguler;
+      
+      const titleEl = document.getElementById('presetCurrentTitle');
+      const descEl = document.getElementById('currentPresetDesc');
+      const badgeTextEl = document.getElementById('activePresetBadgeText');
+      const kioskPresetText = document.getElementById('kioskPresetText');
+
+      if (titleEl) titleEl.innerText = preset.name;
+      if (descEl) descEl.innerText = preset.desc;
+      if (badgeTextEl) badgeTextEl.innerText = preset.name;
+      if (kioskPresetText) kioskPresetText.innerText = preset.name;
+    }
+
+    function saveSchedule(scheduleItem) {
+      const index = state.schedules.findIndex(s => s.id === scheduleItem.id);
+      if (index >= 0) {
+        state.schedules[index] = scheduleItem;
+      } else {
+        state.schedules.push(scheduleItem);
+      }
+
+      state.schedules.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+      persistSchedulesLocal();
+
+      if (!is_preview && supabaseClient) {
+        supabaseClient.from('school_schedules').upsert({
+          id: scheduleItem.id,
+          preset_type: state.activePreset,
+          title: scheduleItem.title,
+          start_time: scheduleItem.startTime,
+          end_time: scheduleItem.endTime,
+          tone_type: scheduleItem.toneType,
+          is_active: scheduleItem.isActive,
+          updated_at: new Date().toISOString()
+        }).then(() => {});
+      }
+
+      renderScheduleTable();
+      showToast("Jadwal bel berhasil disimpan!", "success");
+    }
+
+    function deleteSchedule(id) {
+      state.schedules = state.schedules.filter(s => s.id !== id);
+      persistSchedulesLocal();
+
+      if (!is_preview && supabaseClient) {
+        supabaseClient.from('school_schedules').delete().eq('id', id).then(() => {});
+      }
+
+      renderScheduleTable();
+      showToast("Jadwal bel telah dihapus.", "info");
+    }
+
+    function toggleActiveStatus(id) {
+      const item = state.schedules.find(s => s.id === id);
+      if (item) {
+        item.isActive = !item.isActive;
+        persistSchedulesLocal();
+
+        if (!is_preview && supabaseClient) {
+          supabaseClient.from('school_schedules').update({ is_active: item.isActive }).eq('id', id).then(() => {});
+        }
+
+        renderScheduleTable();
+        showToast(`Status "${item.title}" diubah menjadi ${item.isActive ? 'Aktif' : 'Nonaktif'}`, "info");
+      }
+    }
+
+    const DB_NAME = "AetherBellDB";
+    const DB_VERSION = 1;
+    const STORE_NAME = "custom_sounds";
+    let dbInstance = null;
+
+    function openAudioDB() {
+      return new Promise((resolve, reject) => {
+        if (dbInstance) return resolve(dbInstance);
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: "id" });
+          }
+        };
+        req.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          resolve(dbInstance);
+        };
+        req.onerror = (e) => reject(e.target.error);
+      });
+    }
+
+    async function dbSaveSound(sound) {
+      const db = await openAudioDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.put(sound);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbGetAllSounds() {
+      const db = await openAudioDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbGetSound(id) {
+      const db = await openAudioDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.get(id);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbDeleteSound(id) {
+      const db = await openAudioDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    let audioCtx = null;
+    let isAudioUnlocked = false;
+    let customSoundsList = [];
+    let activeHtml5Audio = null;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      isAudioUnlocked = true;
+      updateAudioButtonUI();
+    }
+
+    function updateAudioButtonUI() {
+      const btn = document.getElementById('btnAudioEngine');
+      const label = document.getElementById('audioEngineLabel');
+      if (isAudioUnlocked) {
+        btn.className = "px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20";
+        label.innerText = "Audio: Aktif";
+      } else {
+        btn.className = "px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 transition-all bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20";
+        label.innerText = "Audio: Klik Aktifkan";
+      }
+    }
+
+    function toggleAudioEngine() {
+      initAudioContext();
+      showToast("Sistem Audio Bel telah diaktifkan!", "success");
+      playAudioToneOrFile('chime_triple');
+    }
+
+    function stopActiveAudio() {
+      if (activeHtml5Audio) {
+        try {
+          activeHtml5Audio.pause();
+          activeHtml5Audio.currentTime = 0;
+        } catch (e) {}
+        activeHtml5Audio = null;
+      }
+    }
+
+    async function playAudioToneOrFile(toneType = 'westminster') {
+      initAudioContext();
+      stopActiveAudio();
+
+      if (toneType && toneType.startsWith('custom_')) {
+        try {
+          const soundItem = await dbGetSound(toneType);
+          if (soundItem && soundItem.blob) {
+            const audioUrl = URL.createObjectURL(soundItem.blob);
+            const audio = new Audio(audioUrl);
+            activeHtml5Audio = audio;
+            audio.volume = 1.0;
+            
+            audio.play().catch(err => {
+              console.warn("Gagal memutar audio MP3:", err);
+              showToast("Klik tombol Audio untuk memberi izin pemutaran.", "error");
+            });
+
+            audio.onended = () => {
+              URL.revokeObjectURL(audioUrl);
+              if (activeHtml5Audio === audio) activeHtml5Audio = null;
+            };
+            return;
+          }
+        } catch (err) {
+          console.error("Gagal memuat MP3 kustom dari IndexedDB:", err);
+        }
+      }
+
+      playSyntheticTone(toneType);
+    }
+
+    function playSyntheticTone(toneType = 'westminster') {
+      initAudioContext();
+      if (!audioCtx) return;
+
+      const now = audioCtx.currentTime;
+
+      const playTone = (freq, startOffset, duration, gainValue = 0.3) => {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + startOffset);
+
+        gainNode.gain.setValueAtTime(0.001, now + startOffset);
+        gainNode.gain.exponentialRampToValueAtTime(gainValue, now + startOffset + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + startOffset + duration);
+
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        osc.start(now + startOffset);
+        osc.stop(now + startOffset + duration + 0.1);
+      };
+
+      if (toneType === 'westminster') {
+        playTone(392.00, 0.0, 0.8, 0.35); // G4
+        playTone(329.63, 0.7, 0.8, 0.35); // E4
+        playTone(349.23, 1.4, 0.8, 0.35); // F4
+        playTone(261.63, 2.1, 1.6, 0.40); // C4
+      } else if (toneType === 'two_tone') {
+        playTone(523.25, 0.0, 0.8, 0.35); // C5
+        playTone(392.00, 0.6, 1.4, 0.35); // G4
+      } else if (toneType === 'chime_triple') {
+        playTone(523.25, 0.0, 0.5, 0.3);
+        playTone(659.25, 0.3, 0.5, 0.3);
+        playTone(783.99, 0.6, 1.2, 0.3);
+      } else if (toneType === 'gong') {
+        playTone(130.81, 0.0, 3.5, 0.5); // C3
+        playTone(196.00, 0.05, 3.0, 0.25); // G3
+      }
+    }
+
+    function announceBellVoice(title) {
+      if (!('speechSynthesis' in window)) return;
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(`Perhatian, saat ini memasuki ${title}. Selamat belajar.`);
+        utterance.lang = 'id-ID';
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn("Speech synthesis error:", e);
+      }
+    }
+
+    function executeScheduledBellEvent(scheduleItem) {
+      playAudioToneOrFile(scheduleItem.toneType);
+      
+      if (!scheduleItem.toneType.startsWith('custom_')) {
+        setTimeout(() => {
+          announceBellVoice(scheduleItem.title);
+        }, 1200);
+      }
+
+      if (state.autoFullscreenOnBell) {
+        activateFullscreenTakeover(scheduleItem, 60);
+      }
+
+      showToast(`Peringatan: Memasuki ${scheduleItem.title}!`, "success");
+    }
+
+    function activateFullscreenTakeover(scheduleItem, durationSeconds = 60) {
+      if (state.takeoverTimeoutId) clearTimeout(state.takeoverTimeoutId);
+      if (state.takeoverIntervalId) clearInterval(state.takeoverIntervalId);
+
+      state.isTakeoverActive = true;
+      state.isKioskActive = true;
+      state.takeoverSecondsLeft = durationSeconds;
+
+      const overlay = document.getElementById('fullscreenKioskOverlay');
+      const pulseNotice = document.getElementById('kioskPulseNotice');
+      const countdownBadge = document.getElementById('takeoverCountdownBadge');
+      const barContainer = document.getElementById('takeoverBarContainer');
+      const progressBar = document.getElementById('takeoverProgressBar');
+      const secondsText = document.getElementById('takeoverSecondsText');
+
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+
+      document.getElementById('kioskCurrentPeriodTitle').innerText = scheduleItem.title;
+      document.getElementById('kioskCurrentPeriodTime').innerText = `${scheduleItem.startTime} - ${scheduleItem.endTime}`;
+
+      pulseNotice.classList.remove('hidden');
+      countdownBadge.classList.remove('hidden');
+      countdownBadge.classList.add('flex');
+      barContainer.classList.remove('hidden');
+
+      secondsText.innerText = `${state.takeoverSecondsLeft}s`;
+      progressBar.style.width = '100%';
+
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+
+      state.takeoverIntervalId = setInterval(() => {
+        state.takeoverSecondsLeft -= 1;
+        if (state.takeoverSecondsLeft >= 0) {
+          secondsText.innerText = `${state.takeoverSecondsLeft}s`;
+          const percent = (state.takeoverSecondsLeft / durationSeconds) * 100;
+          progressBar.style.width = `${percent}%`;
+        }
+      }, 1000);
+
+      state.takeoverTimeoutId = setTimeout(() => {
+        dismissFullscreenTakeoverNow();
+        showToast("Layar penuh 60 detik selesai, kembali ke dasbor utama.", "info");
+      }, durationSeconds * 1000);
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function dismissFullscreenTakeoverNow() {
+      if (state.takeoverTimeoutId) clearTimeout(state.takeoverTimeoutId);
+      if (state.takeoverIntervalId) clearInterval(state.takeoverIntervalId);
+
+      state.isTakeoverActive = false;
+      state.isKioskActive = false;
+
+      const overlay = document.getElementById('fullscreenKioskOverlay');
+      const pulseNotice = document.getElementById('kioskPulseNotice');
+      const countdownBadge = document.getElementById('takeoverCountdownBadge');
+      const barContainer = document.getElementById('takeoverBarContainer');
+
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+      pulseNotice.classList.add('hidden');
+      countdownBadge.classList.add('hidden');
+      countdownBadge.classList.remove('flex');
+      barContainer.classList.add('hidden');
+
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function simulate60sTakeover() {
+      initAudioContext();
+      const timeData = getTimeInTimezone(state.timezone);
+      const { currentPeriod, nextPeriod } = evaluateScheduleState(timeData.shortTime, parseInt(timeData.seconds));
+
+      const mockPeriod = currentPeriod || nextPeriod || {
+        title: "Jam Pelajaran Ke-1",
+        startTime: timeData.shortTime,
+        endTime: "08:15",
+        toneType: "westminster"
+      };
+
+      executeScheduledBellEvent(mockPeriod);
+    }
+
+    function renderScheduleTable() {
+      const tbody = document.getElementById('scheduleTableBody');
+      const emptyState = document.getElementById('emptyScheduleState');
+
+      tbody.innerHTML = '';
+
+      if (state.schedules.length === 0) {
+        emptyState.classList.remove('hidden');
+        return;
+      }
+      emptyState.classList.add('hidden');
+
+      state.schedules.forEach((item, index) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/40 transition border-b border-slate-800/40";
+        
+        tr.innerHTML = `
+          <td class="px-4 py-3.5 font-medium text-slate-100 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center justify-center font-mono border border-slate-700">
+              ${index + 1}
+            </span>
+            <span class="font-semibold">${escapeHtml(item.title)}</span>
+          </td>
+          <td class="px-4 py-3.5 font-mono text-indigo-300 font-bold">${item.startTime}</td>
+          <td class="px-4 py-3.5 font-mono text-slate-400">${item.endTime}</td>
+          <td class="px-4 py-3.5">
+            <span class="px-2 py-0.5 rounded text-[11px] font-mono bg-slate-800 text-slate-300 border border-slate-700">
+              ${formatToneName(item.toneType)}
+            </span>
+          </td>
+          <td class="px-4 py-3.5">
+            <button onclick="toggleActiveStatus('${item.id}')" class="flex items-center gap-1.5 text-xs ${item.isActive ? 'text-emerald-400' : 'text-slate-500'}">
+              <span class="w-2 h-2 rounded-full ${item.isActive ? 'bg-emerald-400' : 'bg-slate-600'}"></span>
+              ${item.isActive ? 'Aktif' : 'Nonaktif'}
+            </button>
+          </td>
+          <td class="px-4 py-3.5 text-right space-x-1">
+            <button onclick="testToneSingle('${item.toneType}')" title="Uji Suara Bel" class="p-1.5 hover:bg-slate-700 text-slate-300 rounded-lg transition">
+              <i data-lucide="volume-2" class="w-4 h-4"></i>
+            </button>
+            <button onclick="editSchedule('${item.id}')" title="Edit Jadwal" class="p-1.5 hover:bg-slate-700 text-indigo-400 rounded-lg transition">
+              <i data-lucide="edit-3" class="w-4 h-4"></i>
+            </button>
+            <button onclick="deleteSchedule('${item.id}')" title="Hapus Jadwal" class="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    function formatToneName(type) {
+      if (type && type.startsWith('custom_')) {
+        const found = customSoundsList.find(s => s.id === type);
+        return found ? `MP3: ${found.name}` : 'MP3 Kustom';
+      }
+      switch(type) {
+        case 'westminster': return 'Westminster 4-Not';
+        case 'two_tone': return 'Ding-Dong 2-Not';
+        case 'chime_triple': return 'Triad 3-Not';
+        case 'gong': return 'Gong Resonansi';
+        default: return 'Melodi Bel';
+      }
+    }
+
+    function escapeHtml(string) {
+      const div = document.createElement('div');
+      div.innerText = string;
+      return div.innerHTML;
+    }
+
+    async function loadCustomSounds() {
+      try {
+        customSoundsList = await dbGetAllSounds();
+        updateToneSelectOptions();
+        renderSoundLibraryList();
+      } catch (err) {
+        console.error("Gagal memuat daftar file MP3 kustom:", err);
+      }
+    }
+
+    function updateToneSelectOptions(selectedId = null) {
+      const optgroup = document.getElementById('formCustomAudioOptgroup');
+      if (!optgroup) return;
+      optgroup.innerHTML = '';
+
+      if (customSoundsList.length === 0) {
+        const opt = document.createElement('option');
+        opt.disabled = true;
+        opt.value = "";
+        opt.innerText = "(Belum ada MP3 diunggah)";
+        optgroup.appendChild(opt);
+      } else {
+        customSoundsList.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.id;
+          opt.innerText = `🎵 MP3: ${item.name} (${item.size})`;
+          optgroup.appendChild(opt);
+        });
+      }
+
+      if (selectedId) {
+        document.getElementById('formToneType').value = selectedId;
+      }
+    }
+
+    function handleToneTypeSelectChange(value) {
+      if (value === '__upload_new__') {
+        document.getElementById('quickUploadSection').classList.remove('hidden');
+      } else {
+        document.getElementById('quickUploadSection').classList.add('hidden');
+      }
+    }
+
+    function hideQuickUploadSection() {
+      document.getElementById('quickUploadSection').classList.add('hidden');
+      document.getElementById('formToneType').value = 'westminster';
+    }
+
+    async function handleQuickUploadMp3() {
+      const fileInput = document.getElementById('mp3QuickFileInput');
+      const file = fileInput.files[0];
+      if (!file) {
+        showToast("Pilih file audio MP3 terlebih dahulu!", "error");
+        return;
+      }
+
+      const newId = await saveAudioFileToDB(file);
+      if (newId) {
+        fileInput.value = '';
+        document.getElementById('quickUploadSection').classList.add('hidden');
+        updateToneSelectOptions(newId);
+        showToast(`File "${file.name}" berhasil disimpan dan dipilih!`, "success");
+        playAudioToneOrFile(newId);
+      }
+    }
+
+    async function saveAudioFileToDB(file) {
+      if (!file.type.includes('audio') && !file.name.match(/\.(mp3|wav|ogg|m4a|aac)$/i)) {
+        showToast("Harap pilih file berformat audio (MP3, WAV, OGG)!", "error");
+        return null;
+      }
+
+      const id = `custom_${Date.now()}`;
+      const soundItem = {
+        id: id,
+        name: file.name,
+        size: (file.size / 1024).toFixed(1) + ' KB',
+        blob: file,
+        mimeType: file.type || 'audio/mpeg',
+        createdAt: new Date().toISOString()
+      };
+
+      try {
+        await dbSaveSound(soundItem);
+        await loadCustomSounds();
+        renderScheduleTable();
+        return id;
+      } catch (err) {
+        console.error("Gagal menyimpan audio:", err);
+        showToast("Gagal menyimpan file audio ke peramban", "error");
+        return null;
+      }
+    }
+
+    function previewCurrentFormTone() {
+      const selectedTone = document.getElementById('formToneType').value;
+      if (!selectedTone || selectedTone === '__upload_new__') {
+        showToast("Pilih salah satu nada atau file MP3 terlebih dahulu", "info");
+        return;
+      }
+      playAudioToneOrFile(selectedTone);
+      showToast(`Pratinjau nada: ${formatToneName(selectedTone)}`, "info");
+    }
+
+    function openSoundLibraryModal() {
+      document.getElementById('soundLibraryModal').classList.remove('hidden');
+      document.getElementById('soundLibraryModal').classList.add('flex');
+      renderSoundLibraryList();
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeSoundLibraryModal() {
+      stopActiveAudio();
+      document.getElementById('soundLibraryModal').classList.add('hidden');
+      document.getElementById('soundLibraryModal').classList.remove('flex');
+    }
+
+    async function handleLibraryFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const newId = await saveAudioFileToDB(file);
+      if (newId) {
+        showToast(`File audio "${file.name}" ditambahkan ke Bank Suara!`, "success");
+        event.target.value = '';
+      }
+    }
+
+    function renderSoundLibraryList() {
+      const container = document.getElementById('soundLibraryList');
+      const countLabel = document.getElementById('customSoundCount');
+      if (!container) return;
+
+      countLabel.innerText = `${customSoundsList.length} File`;
+      container.innerHTML = '';
+
+      if (customSoundsList.length === 0) {
+        container.innerHTML = `
+          <div class="p-6 text-center text-slate-500 text-xs">
+            Belum ada file MP3 yang diunggah. Klik tombol di atas untuk menambahkan.
+          </div>
+        `;
+        return;
+      }
+
+      customSoundsList.forEach(item => {
+        const row = document.createElement('div');
+        row.className = "flex items-center justify-between p-2.5 bg-slate-800/60 border border-slate-700/60 rounded-xl hover:bg-slate-800 transition text-xs";
+        row.innerHTML = `
+          <div class="flex items-center gap-2.5 truncate pr-2">
+            <div class="p-1.5 rounded-lg bg-indigo-600/20 text-indigo-400">
+              <i data-lucide="music" class="w-4 h-4"></i>
+            </div>
+            <div class="truncate">
+              <div class="font-medium text-slate-200 truncate">${escapeHtml(item.name)}</div>
+              <div class="text-[10px] text-slate-400 font-mono">${item.size}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-1 flex-shrink-0">
+            <button onclick="playAudioToneOrFile('${item.id}')" title="Dengarkan" class="p-1.5 hover:bg-slate-700 text-indigo-300 rounded-lg transition">
+              <i data-lucide="play" class="w-4 h-4"></i>
+            </button>
+            <button onclick="deleteCustomSoundItem('${item.id}')" title="Hapus File" class="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function deleteCustomSoundItem(id) {
+      stopActiveAudio();
+      await dbDeleteSound(id);
+      await loadCustomSounds();
+      renderScheduleTable();
+      showToast("File MP3 dihapus dari Bank Suara", "info");
+    }
+
+    function changeTimezone(newTz) {
+      state.timezone = newTz;
+      localStorage.setItem(STORAGE_KEY_TZ, newTz);
+      
+      let badgeText = "WITA";
+      if (newTz === 'Asia/Jakarta') badgeText = "WIB";
+      if (newTz === 'Asia/Jayapura') badgeText = "WIT";
+
+      document.getElementById('tzBadge').innerText = badgeText;
+      document.getElementById('kioskTimezoneBadge').innerText = badgeText;
+      
+      showToast(`Zona waktu diubah ke ${badgeText}`, "info");
+      runClockCycle();
+    }
+
+    function toggleFullscreenKiosk() {
+      const overlay = document.getElementById('fullscreenKioskOverlay');
+      state.isKioskActive = !state.isKioskActive;
+
+      if (state.isKioskActive) {
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } else {
+        overlay.classList.add('hidden');
+        overlay.classList.remove('flex');
+        if (document.fullscreenElement && document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function openScheduleModal(editData = null) {
+      const modal = document.getElementById('scheduleModal');
+      const form = document.getElementById('scheduleForm');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      document.getElementById('quickUploadSection').classList.add('hidden');
+      updateToneSelectOptions();
+
+      if (editData) {
+        document.getElementById('modalTitle').innerHTML = '<i data-lucide="edit-3" class="w-5 h-5 text-indigo-400"></i> Edit Jadwal';
+        document.getElementById('formScheduleId').value = editData.id;
+        document.getElementById('formTitle').value = editData.title;
+        document.getElementById('formStartTime').value = editData.startTime;
+        document.getElementById('formEndTime').value = editData.endTime;
+        document.getElementById('formToneType').value = editData.toneType;
+        document.getElementById('formIsActive').checked = editData.isActive;
+      } else {
+        document.getElementById('modalTitle').innerHTML = '<i data-lucide="clock" class="w-5 h-5 text-indigo-400"></i> Tambah Jadwal Baru';
+        form.reset();
+        document.getElementById('formScheduleId').value = '';
+        document.getElementById('formIsActive').checked = true;
+        document.getElementById('formToneType').value = 'westminster';
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeScheduleModal() {
+      stopActiveAudio();
+      const modal = document.getElementById('scheduleModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function editSchedule(id) {
+      const item = state.schedules.find(s => s.id === id);
+      if (item) openScheduleModal(item);
+    }
+
+    function handleSaveSchedule(e) {
+      e.preventDefault();
+      const id = document.getElementById('formScheduleId').value || `sch_${Date.now()}`;
+      const title = document.getElementById('formTitle').value.trim();
+      const startTime = document.getElementById('formStartTime').value;
+      const endTime = document.getElementById('formEndTime').value;
+      const toneType = document.getElementById('formToneType').value;
+      const isActive = document.getElementById('formIsActive').checked;
+
+      if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
+        showToast("Jam mulai harus lebih awal dari jam selesai!", "error");
+        return;
+      }
+
+      const scheduleItem = { id, title, startTime, endTime, toneType, isActive };
+      saveSchedule(scheduleItem);
+      closeScheduleModal();
+    }
+
+    function resetToDefaultSchedules() {
+      const preset = PRESET_TEMPLATES[state.activePreset] || PRESET_TEMPLATES.reguler;
+      state.schedules = JSON.parse(JSON.stringify(preset.schedules));
+      persistSchedulesLocal();
+      renderScheduleTable();
+      runClockCycle();
+      showToast(`Jadwal "${preset.name}" diatur ulang ke template baku`, "info");
+    }
+
+    function triggerManualChime(tone) {
+      playAudioToneOrFile('westminster');
+      showToast("Bel manual dibunyikan (Westminster Melody)", "info");
+    }
+
+    function testToneSingle(toneType) {
+      playAudioToneOrFile(toneType);
+      showToast(`Memainkan nada: ${formatToneName(toneType)}`, "info");
+    }
+
+    function showToast(message, type = "info") {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let borderCol = "border-indigo-500/40 text-indigo-300 bg-slate-900";
+      let icon = "info";
+
+      if (type === "success") {
+        borderCol = "border-emerald-500/40 text-emerald-300 bg-slate-900";
+        icon = "check-circle";
+      } else if (type === "error") {
+        borderCol = "border-red-500/40 text-red-300 bg-slate-900";
+        icon = "alert-triangle";
+      }
+
+      toast.className = `flex items-center gap-2.5 px-4 py-3 rounded-xl border shadow-xl text-xs font-medium pointer-events-auto transition-all transform duration-300 translate-y-2 opacity-0 ${borderCol}`;
+      toast.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4 flex-shrink-0"></i> <span>${escapeHtml(message)}</span>`;
+
+      container.appendChild(toast);
+      if (window.lucide) lucide.createIcons();
+
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      const tzSelect = document.getElementById('timezoneSelect');
+      tzSelect.value = state.timezone;
+      
+      let badgeText = "WITA";
+      if (state.timezone === 'Asia/Jakarta') badgeText = "WIB";
+      if (state.timezone === 'Asia/Jayapura') badgeText = "WIT";
+      document.getElementById('tzBadge').innerText = badgeText;
+      document.getElementById('kioskTimezoneBadge').innerText = badgeText;
+
+      await loadCustomSounds();
+
+      renderPresetTabs();
+      loadSchedules();
+      initSupabaseRealtime();
+
+      runClockCycle();
+      setInterval(runClockCycle, 1000);
+
+      if (window.lucide) lucide.createIcons();
+
+      window.addEventListener('click', () => {
+        if (!isAudioUnlocked) initAudioContext();
+      }, { once: true });
+    });
+  </script>
+</body>
+</html>
